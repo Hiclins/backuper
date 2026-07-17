@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "backuper"
+version = "0.3.0"
+description = "Modular incremental backup tool (GNU tar + age + S3/local)"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "PyYAML>=6.0",
+    "pathspec>=0.12",
+]
+
+[project.optional-dependencies]
+# Only needed when an S3 destination is configured.
+s3 = ["boto3>=1.28"]
+
+[project.scripts]
+backuper = "backuper.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+backuper = ["py.typed"]

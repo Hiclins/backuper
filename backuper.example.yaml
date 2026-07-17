@@ -1,0 +1,190 @@
+# ============================================================================
+# backuper configuration - example / self-documenting template
+#
+# All values shown are EXAMPLES with invented paths; adapt them to your setup.
+# Where useful, the built-in default is noted as "(default: ...)".
+#
+# backuper looks for a config automatically, in this order:
+#     ./backuper.yaml
+#     ~/.config/backuper/config.yaml
+#     /etc/backuper/config.yaml
+# Override with the BACKUPER_CONFIG env var, or point at one explicitly:
+#     backuper -c /path/to/config.yaml <command>
+#
+# RELATIVE paths in this file (sources, exclude path-forms, state_dir,
+# destination "path", identity_file, log file) are resolved from the DIRECTORY
+# OF THIS CONFIG FILE - never the shell's current directory, so the config
+# behaves the same under cron or from anywhere. Absolute paths and "~" are used
+# as-is.
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# sources  (required) - what to back up
+# ---------------------------------------------------------------------------
+# Entries may be:
+#   - absolute paths       (/srv/myapp/data)
+#   - relative paths       (data, ../shared)      -> from this config's dir
+#   - globs                (*, ../*, data/*.db)   -> expanded on every run;
+#                            "*" INCLUDES dotfiles (.env, .ssh, ...)
+# The archive ROOT is the common parent of all resolved sources, and member
+# names are stored relative to it. In the example below the common parent is
+# /srv/myapp, so members are "data/...", "uploads/...", "config/..." and
+# `restore --dest DIR` lays them out directly under DIR (no long prefixes).
+# (Sources in different trees, e.g. /etc and /srv, push the root up to "/".)
+sources:
+  - /srv/myapp/data
+  - /srv/myapp/uploads
+  - /srv/myapp/config
+
+# Relative / glob alternative (e.g. one config living inside a data folder):
+#   sources:
+#     - "*"                # every entry beside this config file (incl. dotfiles)
+#     - "../shared"        # a sibling directory one level up
+#     - "datasets/*.sqlite"  # a glob of files
+
+# ---------------------------------------------------------------------------
+# exclude  (optional, default: none) - gitignore-style skip rules
+# ---------------------------------------------------------------------------
+# Patterns match MEMBER NAMES, i.e. paths relative to the archive root (the
+# common parent of the sources; /srv/myapp in the example above).
+#   trailing "/"   -> a directory (its contents are skipped too)
+#   "**/"          -> "at any depth"
+#   "*", "?", "[]" -> shell-style wildcards
+# A pattern may also be a real PATH - absolute (/var/tmp), "~", or "../foo".
+# It is resolved from THIS config's directory and matched by location; if it
+# points OUTSIDE the backup (the archive root) it is ignored with a warning.
+# NOTE: negation ("!pattern") is NOT supported and is ignored with a warning.
+exclude:
+  - uploads/tmp/                        # a specific subdir under the root
+  - config/secrets.env                  # a specific file under the root
+  - "**/cache/"                         # any "cache" directory, at any depth
+  - "**/node_modules/"                  # dependency dirs, anywhere
+  - "**/__pycache__/"                   # Python caches, anywhere
+  - "**/*.log"                          # all log files
+  - "**/.DS_Store"                      # macOS Finder cruft
+  # - ../old-backups                    # path-form: relative to this config dir
+  # - /var/tmp                          # absolute path-form (dropped if outside)
+
+# ---------------------------------------------------------------------------
+# state_dir  (optional, default: ~/.local/state/backuper)
+# ---------------------------------------------------------------------------
+# Local working state: the catalog (catalog.json) and the GNU tar snapshot
+# files (*.snar). These are ALSO mirrored to every destination, so restore
+# works on a fresh machine even if this directory is lost.
+state_dir: /var/lib/backuper
+
+# ---------------------------------------------------------------------------
+# archive  (optional) - how each archive is produced
+# ---------------------------------------------------------------------------
+archive:
+  name_prefix: myapp                    # artifact names: myapp-<timestamp>-L<level>...
+                                        # (default: backup)
+
+  # Compression algorithm. Ordered roughly by ratio (higher = smaller file):
+  #   xz    -> LZMA2, best ratio, slowest (closest to `7z -mx=9`)
+  #   zstd  -> great ratio at high levels, MUCH faster; supports a large window
+  #   gzip  -> widely compatible, modest ratio
+  #   none  -> no compression (e.g. already-compressed data)
+  compression: zstd                     # xz | zstd | gzip | none  (default: zstd)
+
+  # Compression level - meaning depends on the algorithm:
+  #   xz:   0..9    (with extreme: true -> -9e, the maximum ratio)
+  #   zstd: 1..22   (levels above 19 require ultra: true)
+  #   gzip: 1..9
+  level: 19                             # (default: 19)
+
+  # Extra knobs for MAXIMUM ratio (each applies only to the noted algorithm):
+  extreme: false                        # xz  : enable -e (i.e. -9e)      (default: false)
+  ultra: false                          # zstd: unlock levels 20..22      (default: false)
+  long: false                           # zstd: --long=31 (large window)  (default: false)
+                                        #   NB: external `zstd -d` then needs --long=31
+  threads: 0                            # xz -T / zstd -T; 0 = all cores  (default: 0)
+
+  # GNU tar is required for incremental backups. "auto" finds `gtar` or a `tar`
+  # that reports "GNU tar"; or give an explicit path. (macOS: brew install gnu-tar)
+  tar_binary: auto                      # (default: auto)
+
+# ---------------------------------------------------------------------------
+# mode  (optional) - full vs incremental cadence
+# ---------------------------------------------------------------------------
+mode:
+  # full        -> a full backup every run (a fresh chain each time)
+  # incremental -> a full only when needed (see full_interval / full_on), then
+  #                incrementals that store just what changed since the last run
+  strategy: incremental                 # full | incremental  (default: incremental)
+
+  # Start a NEW chain (fresh full) using ONE of two forms:
+  #   duration -> <n>d / <n>h / <n>m : full when the current full is older than
+  #               this (e.g. 7d)
+  #   count    -> a plain integer, or <n>i / <n>x : full after that many
+  #               incrementals (e.g. 10 -> full, then 10 incrementals, then full)
+  # Set to null / comment out to disable time/count-based rollover.
+  full_interval: 7d                     # (default: 7d)
+  # full_interval: 30                   # alt: a new full after every 30 incrementals
+
+  # Optional extra trigger: also force a full on this weekday.
+  # full_on: sunday                     # (default: none)
+
+# ---------------------------------------------------------------------------
+# encryption  (optional, default: disabled) - client-side, via `age`
+# ---------------------------------------------------------------------------
+encryption:
+  enabled: true                         # false -> archives are stored unencrypted
+  backend: age                          # age (only backend today; brew install age)
+
+  # Public keys to ENCRYPT to (one or more). Generate a keypair with
+  #   age-keygen -o age.key
+  # and copy the printed "Public key: age1..." line here.
+  recipients:
+    - age1exampleaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0
+    # - age1examplebbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb1  # 2nd recipient
+
+  # PRIVATE key - needed ONLY for `restore` / `verify` of encrypted archives.
+  # Keep it OFF the backed-up machine if you can (store it somewhere safe).
+  identity_file: ~/.config/backuper/age.key
+
+# ---------------------------------------------------------------------------
+# destinations  (required) - where backups go
+# ---------------------------------------------------------------------------
+# Every backup (artifact + .sha256 + snapshot + catalog) is uploaded to ALL of
+# them. `name` is an optional label used by `restore/verify --destination`.
+destinations:
+  # --- Local directory -----------------------------------------------------
+  - type: local
+    name: local                         # (default: local0)
+    path: /var/backups/myapp
+
+  # --- Amazon S3 (or any S3-compatible service) ----------------------------
+  # Credentials are OPTIONAL here. If omitted, the standard AWS chain is used
+  # (env vars, ~/.aws/credentials, or an IAM role) - the RECOMMENDED setup.
+  # Inline keys work too; if you use them, `chmod 600` this file and keep it out
+  # of version control.
+  - type: s3
+    name: s3                            # (default: s31)
+    bucket: my-backups-example
+    prefix: myapp                       # key prefix inside the bucket (optional)
+    region: us-east-1                   # (optional)
+    storage_class: INTELLIGENT_TIERING  # STANDARD | INTELLIGENT_TIERING | GLACIER | ... (optional)
+    # access_key_id: AKIAEXAMPLE...     # optional inline credentials
+    # secret_access_key: examplesecret  # optional inline credentials
+    # endpoint_url: https://s3.example.com  # optional: MinIO / Backblaze B2 / Cloudflare R2
+
+# ---------------------------------------------------------------------------
+# retention  (optional) - GFS policy, applied to WHOLE chains
+# ---------------------------------------------------------------------------
+# A full plus its incrementals are always kept or dropped together, so an
+# incremental never loses the full it depends on. A chain counts under the
+# bucket of its most recent backup. Set a bucket to 0 to disable it.
+retention:
+  keep_last: 3                          # always keep the N most recent chains (default: 3)
+  daily: 7                              # keep one chain per day for 7 days   (default: 0)
+  weekly: 4                             # keep one chain per week for 4 weeks  (default: 0)
+  monthly: 6                            # keep one chain per month for 6 months (default: 0)
+
+# ---------------------------------------------------------------------------
+# logging  (optional)
+# ---------------------------------------------------------------------------
+logging:
+  level: info                           # debug | info | warning | error  (default: info)
+  file: /var/log/backuper.log           # also log here, besides stderr    (default: none)
+  json: false                           # true -> structured JSON log lines (default: false)

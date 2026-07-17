@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Real configs / secrets - never commit these. Use backuper.example.yaml as a
+# template and keep your actual config outside the repo (or gitignored locally).
+config.yaml
+backuper.yaml
+*.key
+*.age
+*.snar
+state/
+.env
+
+.DS_Store
