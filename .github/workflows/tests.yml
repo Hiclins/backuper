@@ -1,0 +1,28 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install system dependencies (age, zstd, xz — GNU tar is Ubuntu's default tar)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y age zstd xz-utils
+
+      - name: Install package
+        run: pip install -e '.[test,s3]'
+
+      - name: Run tests
+        run: pytest --cov=backuper --cov-report=term-missing

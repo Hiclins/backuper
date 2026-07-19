@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "backuper"
-version = "0.3.0"
+version = "0.4.0"
 description = "Modular incremental backup tool (GNU tar + age + S3/local)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,6 +16,10 @@ dependencies = [
 [project.optional-dependencies]
 # Only needed when an S3 destination is configured.
 s3 = ["boto3>=1.28"]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
 
 [project.scripts]
 backuper = "backuper.cli:main"
@@ -25,3 +29,14 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 backuper = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: end-to-end tests invoking real gtar/age/zstd/xz/gzip; auto-skipped if GNU tar is unavailable",
+]
+
+[tool.coverage.run]
+source = ["src/backuper"]
+branch = true

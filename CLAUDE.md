@@ -15,6 +15,7 @@ All code and config comments are written in **English**.
 
 ```sh
 pip install -e .            # dev install; use '.[s3]' to include boto3 for S3
+pip install -e '.[test]'    # add pytest/pytest-cov for the test suite
 
 # Run the CLI (console script or module form):
 backuper -c config.yaml <command>
@@ -26,14 +27,24 @@ backuper -c CFG restore --target <latest|ISO8601> --dest DIR [--destination NAME
 backuper -c CFG verify [--all] [--destination NAME]
 backuper -c CFG list
 backuper -c CFG prune [-n/--dry-run]
+
+# Tests:
+pytest                       # full suite (unit + integration)
+pytest -m "not integration"  # fast subset, no external binaries required
+pytest --cov=backuper --cov-report=term-missing
 ```
 
-There is no test suite yet. Verification is done end-to-end against a temporary
-local destination (see "Verifying changes"). External binaries are required at
-runtime: **GNU tar** (`gtar`), **age** (if encryption on), and the selected
-compressor (`xz`/`zstd`/`gzip`). On macOS: `brew install gnu-tar age zstd xz`
-(GNU tar installs as `gtar`; the system `tar` is bsdtar and will NOT work for
-incremental backups — `config.resolve_gnu_tar` probes `--version` for "GNU tar").
+Tests live under `tests/`: `tests/unit/` is pure/hermetic (mocked binaries,
+`tmp_path`, no network); `tests/integration/` drives the CLI end-to-end
+through real `gtar`/`age`/`zstd`/`xz`/`gzip` against a temporary local
+destination — the same style of verification this project always did by
+hand (see "Verifying changes"). Integration tests are tagged
+`@pytest.mark.integration` and auto-skip if GNU tar isn't installed.
+External binaries are required at runtime: **GNU tar** (`gtar`), **age** (if
+encryption on), and the selected compressor (`xz`/`zstd`/`gzip`). On macOS:
+`brew install gnu-tar age zstd xz` (GNU tar installs as `gtar`; the system
+`tar` is bsdtar and will NOT work for incremental backups —
+`config.resolve_gnu_tar` probes `--version` for "GNU tar").
 
 ## Architecture
 
