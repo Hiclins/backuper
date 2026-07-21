@@ -18,6 +18,7 @@ from __future__ import annotations
 import glob
 import logging
 import os
+import sys
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,23 @@ _GLOB_CHARS = ("*", "?", "[")
 
 def _has_glob(pattern: str) -> bool:
     return any(ch in pattern for ch in _GLOB_CHARS)
+
+
+def _glob_include_hidden(pattern: str) -> list[str]:
+    """Like glob.glob(pattern, recursive=True) but also matching dotfiles.
+
+    `include_hidden` was only added to glob.glob() in Python 3.11. On older
+    versions we get the same effect by temporarily disabling glob's private
+    hidden-file filter, which has had the same shape since Python 3.4.
+    """
+    if sys.version_info >= (3, 11):
+        return glob.glob(pattern, recursive=True, include_hidden=True)
+    original = glob._ishidden
+    glob._ishidden = lambda path: False
+    try:
+        return glob.glob(pattern, recursive=True)
+    finally:
+        glob._ishidden = original
 
 
 def resolve_source_paths(patterns: list[str], base_dir: Path) -> list[str]:
@@ -44,7 +62,7 @@ def resolve_source_paths(patterns: list[str], base_dir: Path) -> list[str]:
             pattern = os.path.join(str(base_dir), pattern)
 
         if _has_glob(pattern):
-            matches = glob.glob(pattern, recursive=True, include_hidden=True)
+            matches = _glob_include_hidden(pattern)
             if not matches:
                 log.warning("source pattern matched nothing: %s", raw)
                 continue

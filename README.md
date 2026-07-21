@@ -27,7 +27,7 @@ chosen.
 
 ## Requirements
 
-- Python 3.11+
+- Python 3.9+
 - **GNU tar** (`gtar` / `tar` that reports "GNU tar")
 - **age** (only if `encryption.enabled`)
 - **xz** / **zstd** / **gzip** (only the one selected by `archive.compression`)
