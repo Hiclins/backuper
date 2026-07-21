@@ -1,3 +1,8 @@
 """backuper - modular incremental backup tool."""
 
-__version__ = "0.4.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("backuper")
+except PackageNotFoundError:
+    __version__ = "0+unknown"
