@@ -60,6 +60,7 @@ class RetentionConfig:
     daily: int = 0
     weekly: int = 0
     monthly: int = 0
+    yearly: int = 0
 
 
 @dataclass

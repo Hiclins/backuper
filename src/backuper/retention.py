@@ -50,6 +50,7 @@ def select_chains_to_drop(
         keep,
     )
     _keep_by_bucket(newest_first, lambda t: (t.year, t.month), policy.monthly, keep)
+    _keep_by_bucket(newest_first, lambda t: t.year, policy.yearly, keep)
 
     drop = [c for c in chains if c.id not in keep]
     return drop, keep

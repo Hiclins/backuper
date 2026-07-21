@@ -180,6 +180,7 @@ retention:
   daily: 7                              # keep one chain per day for 7 days   (default: 0)
   weekly: 4                             # keep one chain per week for 4 weeks  (default: 0)
   monthly: 6                            # keep one chain per month for 6 months (default: 0)
+  yearly: 2                             # keep one chain per year for 2 years  (default: 0)
 
 # ---------------------------------------------------------------------------
 # logging  (optional)

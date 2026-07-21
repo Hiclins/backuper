@@ -8,7 +8,7 @@ from helpers import make_chain, make_entry
 
 
 def _policy(**kwargs) -> RetentionConfig:
-    defaults = {"keep_last": 0, "daily": 0, "weekly": 0, "monthly": 0}
+    defaults = {"keep_last": 0, "daily": 0, "weekly": 0, "monthly": 0, "yearly": 0}
     defaults.update(kwargs)
     return RetentionConfig(**defaults)
 
@@ -91,6 +91,37 @@ def test_monthly_bucket_keeps_newest_in_same_month():
     drop, keep = select_chains_to_drop(chains, _policy(monthly=1))
     assert keep == {"late"}
     assert {c.id for c in drop} == {"early"}
+
+
+def test_yearly_bucket_keeps_newest_per_year():
+    chains = [
+        _single_chain("y2024", "2024-06-15T00:00:00"),
+        _single_chain("y2025-early", "2025-02-01T00:00:00"),
+        _single_chain("y2025-late", "2025-11-01T00:00:00"),
+    ]
+    drop, keep = select_chains_to_drop(chains, _policy(yearly=2))
+    # newest-per-year: 2025 -> y2025-late (later), 2024 -> y2024
+    assert keep == {"y2025-late", "y2024"}
+    assert {c.id for c in drop} == {"y2025-early"}
+
+
+def test_yearly_bucket_zero_disables_bucket():
+    chains = [_single_chain("c1", "2026-01-01T00:00:00")]
+    drop, keep = select_chains_to_drop(chains, _policy(yearly=0))
+    assert {c.id for c in drop} == {"c1"}
+    assert keep == set()
+
+
+def test_yearly_bucket_limited_to_count_most_recent_years():
+    chains = [
+        _single_chain("y2022", "2022-01-01T00:00:00"),
+        _single_chain("y2023", "2023-01-01T00:00:00"),
+        _single_chain("y2024", "2024-01-01T00:00:00"),
+        _single_chain("y2025", "2025-01-01T00:00:00"),
+    ]
+    drop, keep = select_chains_to_drop(chains, _policy(yearly=2))
+    assert keep == {"y2025", "y2024"}
+    assert {c.id for c in drop} == {"y2023", "y2022"}
 
 
 def test_combined_policy_is_union_of_keeps():
